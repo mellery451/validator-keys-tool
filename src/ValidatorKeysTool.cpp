@@ -20,9 +20,12 @@
 
 #include <ValidatorKeysTool.h>
 #include <ValidatorKeys.h>
+
+#include <ripple/basics/StringUtilities.h>
 #include <ripple/beast/core/PlatformConfig.h>
 #include <ripple/beast/core/SemanticVersion.h>
 #include <ripple/beast/unit_test.h>
+#include <beast/core/detail/base64.hpp>
 #include <beast/unit_test/dstream.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
@@ -152,6 +155,82 @@ void createRevocation (boost::filesystem::path const& keyFile)
     std::cout << std::endl;
 }
 
+void attestDomain(ripple::ValidatorKeys const& keys)
+{
+    if (keys.domain().empty())
+    {
+        std::cout << "No attestation is necessary if no domain is specified!\n";
+        return;
+    }
+
+    std::cout << "The domain attestation token is:\n";
+
+    // Nothing up our sleeve: this is the amendment identifier of the amendment
+    // which introduced the on-ledger manifest feature on XRP Ledger. It is the
+    // first 32 bytes of the SHA512 of the string "OnLedgerManifests":
+
+    using namespace ripple;
+
+    std::cout << "\n";
+    std::cout << "[[domain-attestation]]\n";
+    std::cout << "pubkey=\"" << toBase58 (TOKEN_NODE_PUBLIC, keys.publicKey()) << "\"\n";
+    std::cout << "domain=\"" << keys.domain() << "\"\n";
+    std::cout << "signature=\"" << keys.sign (
+        "15C4447A07A0755204720D67C6C7C8E4E337682DA3505A57754C9267F6D1256B:" +
+        keys.domain() + ":" +
+        toBase58 (TOKEN_NODE_PUBLIC, keys.publicKey())) << "\"\n\n";
+}
+
+void attestDomain(boost::filesystem::path const& keyFile)
+{
+    using namespace ripple;
+
+    auto keys = ValidatorKeys::make_ValidatorKeys (keyFile);
+
+    if (keys.revoked())
+        throw std::runtime_error (
+            "Operation error: The specified master key has been revoked!");
+
+    attestDomain(keys);
+}
+
+void setDomain (std::string const& domain,
+    boost::filesystem::path const& keyFile)
+{
+    using namespace ripple;
+
+    auto keys = ValidatorKeys::make_ValidatorKeys (keyFile);
+
+    if (keys.revoked())
+        throw std::runtime_error (
+            "Operation error: The specified master key has been revoked!");
+
+    if (domain == keys.domain())
+    {
+        std::cout << "The domain name was already set.\n";
+        return;
+    }
+
+    keys.domain(domain);
+
+    if (domain.empty())
+    {
+        std::cout << "The domain name has been cleared.\n";
+        std::cout << "If you had published a domain attestation token in the ";
+        std::cout << "past, please remove it now.\n";
+    }
+    else
+    {
+        std::cout << "The domain name has been set.\n";
+        std::cout << "You should publish a domain attestation token to allow ";
+        std::cout << "others to associate this validator with your domain.";
+        attestDomain(keys);
+    }
+
+    // Update key file with new token sequence
+    keys.writeToFile (keyFile);
+}
+
 void signData (std::string const& data,
     boost::filesystem::path const& keyFile)
 {
@@ -170,6 +249,40 @@ void signData (std::string const& data,
     std::cout << std::endl;
 }
 
+void generateManifest (
+    std::string const& type,
+    boost::filesystem::path const& keyFile)
+{
+    using namespace ripple;
+
+    auto keys = ValidatorKeys::make_ValidatorKeys (keyFile);
+
+    auto const m = keys.manifest();
+
+    if (m.empty())
+    {
+        std::cout << "The last manifest generated is unavailable. You can\n";
+        std::cout << "generate a new one.\n\n";
+        return;
+    }
+
+    if (type == "base64")
+    {
+        std::cout << "Manifest #" << keys.sequence() << " (Base64):\n";
+        std::cout << beast::detail::base64_encode(m.data(), m.size()) << "\n\n";
+        return;
+    }
+
+    if (type == "hex")
+    {
+        std::cout << "Manifest #" << keys.sequence() << " (Hex):\n";
+        std::cout << strHex(makeSlice(m)) << "\n\n";
+        return;
+    }
+
+    std::cout << "Unknown encoding '" << type << "'\n";
+}
+
 int runCommand (std::string const& command,
     std::vector <std::string> const& args,
     boost::filesystem::path const& keyFile)
@@ -180,7 +293,12 @@ int runCommand (std::string const& command,
         { "create_keys", 0 },
         { "create_token", 0 },
         { "revoke_keys", 0 },
-        { "sign", 1 }};
+        { "domain.set", 1 },
+        { "domain.clear", 0 },
+        { "domain.attest", 0 },
+        { "manifest", 1 },
+        { "sign", 1 },
+    };
 
     auto const iArgs = commandArgs.find (command);
 
@@ -196,8 +314,16 @@ int runCommand (std::string const& command,
         createToken (keyFile);
     else if (command == "revoke_keys")
         createRevocation (keyFile);
+    else if (command == "domain.set")
+        setDomain (args[0], keyFile);
+    else if (command == "domain.clear")
+        setDomain ("", keyFile);
+    else if (command == "domain.attest")
+        attestDomain (keyFile);
     else if (command == "sign")
         signData (args[0], keyFile);
+    else if (command == "manifest")
+        generateManifest (args[0], keyFile);
 
     return 0;
 }
@@ -223,10 +349,14 @@ void printHelp (const boost::program_options::options_description& desc)
         << "validator-keys [options] <command> [<argument> ...]\n"
         << desc << std::endl
         << "Commands: \n"
-           "     create_keys        Generate validator keys.\n"
-           "     create_token       Generate validator token.\n"
-           "     revoke_keys        Revoke validator keys.\n"
-           "     sign <data>        Sign string with validator key.\n";
+           "     create_keys         Generate validator keys.\n"
+           "     create_token        Generate validator token.\n"
+           "     revoke_keys         Revoke validator keys.\n"
+           "     sign <data>         Sign string with validator key.\n"
+           "     manifest            Displays the last generated manifest\n"
+           "     domain.set <domain> Associate a domain with the validator key.\n"
+           "     domain.clear        Disassociate a domain from a validator key.\n"
+           "     domain.attest       Produce the attestation string for a domain.\n";
 }
 //LCOV_EXCL_STOP
 
