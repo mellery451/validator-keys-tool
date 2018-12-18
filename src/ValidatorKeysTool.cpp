@@ -21,11 +21,11 @@
 #include <ValidatorKeysTool.h>
 #include <ValidatorKeys.h>
 
+#include <ripple/basics/base64.h>
 #include <ripple/basics/StringUtilities.h>
 #include <ripple/beast/core/PlatformConfig.h>
 #include <ripple/beast/core/SemanticVersion.h>
 #include <ripple/beast/unit_test.h>
-#include <beast/core/detail/base64.hpp>
 #include <beast/unit_test/dstream.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
@@ -173,12 +173,12 @@ void attestDomain(ripple::ValidatorKeys const& keys)
 
     std::cout << "\n";
     std::cout << "[[domain-attestation]]\n";
-    std::cout << "pubkey=\"" << toBase58 (TOKEN_NODE_PUBLIC, keys.publicKey()) << "\"\n";
+    std::cout << "pubkey=\"" << toBase58 (TokenType::NodePublic, keys.publicKey()) << "\"\n";
     std::cout << "domain=\"" << keys.domain() << "\"\n";
     std::cout << "signature=\"" << keys.sign (
         "15C4447A07A0755204720D67C6C7C8E4E337682DA3505A57754C9267F6D1256B:" +
         keys.domain() + ":" +
-        toBase58 (TOKEN_NODE_PUBLIC, keys.publicKey())) << "\"\n\n";
+        toBase58 (TokenType::NodePublic, keys.publicKey())) << "\"\n\n";
 }
 
 void attestDomain(boost::filesystem::path const& keyFile)
@@ -269,7 +269,7 @@ void generateManifest (
     if (type == "base64")
     {
         std::cout << "Manifest #" << keys.sequence() << " (Base64):\n";
-        std::cout << beast::detail::base64_encode(m.data(), m.size()) << "\n\n";
+        std::cout << ripple::base64_encode(m.data(), m.size()) << "\n\n";
         return;
     }
 

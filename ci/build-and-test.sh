@@ -18,6 +18,7 @@ fi
 echo "BUILD TYPE: ${BUILD_TYPE}"
 
 : ${APP:=validator-keys}
+: ${APP_ARGS:=--unittest}
 echo "using APP: ${APP}"
 
 JOBS=${NUM_PROCESSORS:-2}
@@ -45,7 +46,6 @@ echo "cmake building ${APP}"
 : ${COVERAGE:=false}
 if [[ ${COVERAGE} == true ]]; then
     echo "coverage option detected."
-    export PATH=$PATH:${LCOV_ROOT}/usr/bin
 fi
 
 #
@@ -54,12 +54,10 @@ fi
 #
 : "${BUILD_DIR:=${COMPNAME}.${BUILD_TYPE}}"
 BUILDARGS=" -j${JOBS}"
-if [[ ${VERBOSE_BUILD:-} == true ]]; then
-  CMAKE_EXTRA_ARGS+=" -DCMAKE_VERBOSE_MAKEFILE=ON"
-  # TODO: if we use a different generator, this
-  # option to build verbose would need to change:
-  BUILDARGS+=" verbose=1"
-fi
+CMAKE_EXTRA_ARGS+=" -DCMAKE_VERBOSE_MAKEFILE=ON"
+# TODO: if we use a different generator, this
+# option to build verbose would need to change:
+BUILDARGS+=" verbose=1"
 if [ -d "build/${BUILD_DIR}" ]; then
   rm -rf "build/${BUILD_DIR}"
 fi
@@ -79,6 +77,7 @@ echo "using APP_PATH: ${APP_PATH}"
 ldd ${APP_PATH}
 
 if [[ ${COVERAGE} == true ]]; then
+  # TODO: LCOV_EXCLUDE_FILES="*/src/test/*"
   # Push the results (lcov.info) to codecov
   codecov -X gcov # don't even try and look for .gcov files ;)
   find . -name "*.gcda" | xargs rm -f

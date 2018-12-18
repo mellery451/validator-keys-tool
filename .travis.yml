@@ -1,88 +1,61 @@
-sudo: false
 language: cpp
 dist: xenial
 
+services:
+  - docker
+
 env:
   global:
-    # Maintenance note: to move to a new version
-    # of boost, update both BOOST_ROOT and BOOST_URL.
-    # Note that for simplicity, BOOST_ROOT's final
-    # namepart must match the folder name internal
-    # to boost's .tar.gz.
-    - LCOV_ROOT=$HOME/lcov
-    - LCOV_EXCLUDE_FILES="*/src/test/*"
-    - BOOST_ROOT=$HOME/boost_1_67_0
-    - BOOST_URL='http://sourceforge.net/projects/boost/files/boost/1.67.0/boost_1_67_0.tar.gz'
-    - APP=validator-keys
-    - APP_ARGS=--unittest
+    - DOCKER_IMAGE="mellery451/rippled-ci-builder:2019-08-26"
     - VERBOSE_BUILD=true
-    - GCC_VER=7
-
-addons:
-  apt:
-    sources:
-      - ubuntu-toolchain-r-test
-      - llvm-toolchain-xenial-7
-    packages:
-      - gcc-7
-      - g++-7
-      - gcc-8
-      - g++-8
-      - python-software-properties
-      - protobuf-compiler
-      - libprotobuf-dev
-      - libssl-dev
-      - libstdc++6
-      - binutils-gold
-      - gdb
-      - texinfo
-      - cmake
-      - lcov
-      - llvm-7
-      - clang-7
-
-matrix:
-  include:
-
-    - compiler: gcc
-      env:
-      - BUILD_TYPE=Debug
-      - CMAKE_EXTRA_ARGS=-Dcoverage=ON
-
-    - compiler: clang
-      env:
-      - BUILD_TYPE=Debug
-
-    - compiler: gcc
-      env:
-      - BUILD_TYPE=Release
-
-    - compiler: clang
-      env:
-      - BUILD_TYPE=Release
-
-    - compiler: gcc
-      env:
-      - BUILD_TYPE=Debug
-      - CMAKE_EXTRA_ARGS=-Drippled_tag=master
-
-    - compiler: gcc
-      env:
-      - BUILD_TYPE=Debug
-      - CMAKE_EXTRA_ARGS=-Drippled_tag=develop
-
-cache:
-  directories:
-  - $BOOST_ROOT
+    - MAX_TIME_MIN=80
+    - CACHE_DIR=${TRAVIS_HOME}/_cache
 
 before_install:
-  - ( ci/install-dependencies.sh )
-  - export PATH=/usr/local/bin:$PATH
+  - if [ "$(uname)" = "Darwin" ] ; then export NUM_PROCESSORS=$(sysctl -n hw.physicalcpu); else export NUM_PROCESSORS=$(nproc); fi
+  - echo "NUM PROC is ${NUM_PROCESSORS}"
+  - if [ "$(uname)" = "Linux" ] ; then docker pull ${DOCKER_IMAGE}; fi
+  - if [ "${MATRIX_EVAL}" != "" ] ; then eval "${MATRIX_EVAL}"; fi
+  - if [ "${CMAKE_ADD}" != "" ] ; then export CMAKE_EXTRA_ARGS="${CMAKE_EXTRA_ARGS} ${CMAKE_ADD}"; fi
+
+matrix:
+  fast_finish: true
+  include:
+    # debug builds
+    - compiler: gcc-8
+      name: gcc-8, debug
+      env:
+        - MATRIX_EVAL="CC=gcc-8 && CXX=g++-8"
+        - BUILD_TYPE=Debug
+    - compiler: clang-8
+      name: clang-8, debug
+      env:
+        - MATRIX_EVAL="CC=clang-8 && CXX=clang++-8"
+        - BUILD_TYPE=Debug
+    # release builds
+    - compiler: gcc-8
+      name: gcc-8, release
+      env:
+        - MATRIX_EVAL="CC=gcc-8 && CXX=g++-8"
+        - BUILD_TYPE=Release
+    - compiler: clang-8
+      name: clang-8, release
+      env:
+        - MATRIX_EVAL="CC=clang-8 && CXX=clang++-8"
+        - BUILD_TYPE=Release
+    # coverage
+    - compiler: gcc-8
+      name: coverage
+      env:
+        - MATRIX_EVAL="CC=gcc-8 && CXX=g++-8"
+        - BUILD_TYPE=Debug
+        - COVERAGE=true
 
 script:
-  - ci/build-and-test.sh
+  - travis_wait ${MAX_TIME_MIN} ci/build-in-docker.sh
 
 notifications:
-  email:
-    false
+  email: false
+
+
 

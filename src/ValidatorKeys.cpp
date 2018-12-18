@@ -25,7 +25,6 @@
 #include <ripple/json/to_string.h>
 #include <ripple/protocol/HashPrefix.h>
 #include <ripple/protocol/Sign.h>
-#include <beast/core/detail/base64.hpp>
 #include <boost/algorithm/clamp.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/regex.hpp>
@@ -165,15 +164,15 @@ ValidatorKeys::make_ValidatorKeys (
 
         auto ret = strUnHex (jKeys["manifest"].asString());
 
-        if (!ret.second || ret.first.size() == 0)
+        if (!ret || ret->size() == 0)
             throw std::runtime_error (
                 "Key file '" + keyFile.string() +
                 "' contains invalid \"manifest\" field: " +
                 jKeys["manifest"].toStyledString());
 
         vk.manifest_.clear();
-        vk.manifest_.reserve(ret.first.size());
-        std::copy(ret.first.begin(), ret.first.end(),
+        vk.manifest_.reserve(ret->size());
+        std::copy(ret->begin(), ret->end(),
             std::back_inserter(vk.manifest_));
     }
 
@@ -247,7 +246,9 @@ ValidatorKeys::createValidatorToken (
     manifest_.reserve(s.size());
     std::copy(s.begin(), s.end(), std::back_inserter(manifest_));
 
-    return ValidatorToken {ripple::base64_encode(manifest_), tokenSecret };
+    return ValidatorToken {
+        ripple::base64_encode(manifest_.data(), manifest_.size()),
+        tokenSecret };
 }
 
 std::string
@@ -268,7 +269,7 @@ ValidatorKeys::revoke ()
     manifest_.reserve(s.size());
     std::copy(s.begin(), s.end(), std::back_inserter(manifest_));
 
-    return ripple::base64_encode(manifest_);
+    return ripple::base64_encode(manifest_.data(), manifest_.size());
 }
 
 std::string

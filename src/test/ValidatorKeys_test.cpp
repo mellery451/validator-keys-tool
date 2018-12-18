@@ -381,6 +381,22 @@ private:
         }
     }
 
+    void
+    testDomain ()
+    {
+        testcase ("Domain");
+        ValidatorKeys vk{KeyType::secp256k1};
+        vk.domain("google.com");
+        BEAST_EXPECT (vk.domain() == "google.com");
+        // b/c we don't support utf-8 IDN
+        except<std::runtime_error>([&vk](){vk.domain("大阪.jp");});
+        // // Hellenic Ministry of Infrastructure, Transport, and Networks
+        except<std::runtime_error>([&vk](){vk.domain("one.two.ελ");});
+        // punycode for above doesn't work either
+        // xn--qxam ("el", Greek) : GR
+        except<std::runtime_error>([&vk](){vk.domain("one.two.xn--qxam");});
+    }
+
 public:
     void
     run() override
@@ -390,6 +406,7 @@ public:
         testRevoke ();
         testSign ();
         testWriteToFile ();
+        testDomain ();
     }
 };
 
