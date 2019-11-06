@@ -24,7 +24,9 @@ then
   tar xzf /tmp/boost.tar.gz
   cd $BOOST_ROOT && \
     $time ./bootstrap.sh --prefix=$BOOST_ROOT && \
-    $time ./b2 cxxflags="-std=c++14" -j$((2*${NUM_PROCESSORS:-2})) &&\
+    $time ./b2 cxxflags="-std=c++14" \
+        runtime-link="static,shared" \
+        --layout=tagged -j$((2*${NUM_PROCESSORS:-2})) && \
     $time ./b2 install
 else
   echo "Using cached boost at $BOOST_ROOT"
