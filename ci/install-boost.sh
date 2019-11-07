@@ -6,15 +6,7 @@
 # folder name internal to boost's .tar.gz
 # When testing you can force a boost build by clearing travis caches:
 # https://travis-ci.org/ripple/rippled/caches
-set -e
-
-if [ -x /usr/bin/time ] ; then
-  : ${TIME:="Duration: %E"}
-  export TIME
-  time=/usr/bin/time
-else
-  time=
-fi
+set -exu
 
 if [ ! -d "$BOOST_ROOT/lib" ]
 then
@@ -22,12 +14,19 @@ then
   cd `dirname $BOOST_ROOT`
   rm -fr ${BOOST_ROOT}
   tar xzf /tmp/boost.tar.gz
-  cd $BOOST_ROOT && \
-    $time ./bootstrap.sh --prefix=$BOOST_ROOT && \
-    $time ./b2 cxxflags="-std=c++14" \
-        runtime-link="static,shared" \
-        --layout=tagged -j$((2*${NUM_PROCESSORS:-2})) && \
-    $time ./b2 install
+  cd $BOOST_ROOT
+  ./bootstrap.sh
+  BLDARGS=()
+  BLDARGS+=(--without-python)
+  BLDARGS+=(-j$((2*${NUM_PROCESSORS:-2})))
+  BLDARGS+=(--prefix=${BOOST_ROOT}/_INSTALLED_)
+  #BLDARGS+=(-d0) # suppress messages/output
+  BLDARGS+=(cxxflags="-std=c++14")
+  BLDARGS+=(runtime-link="static,shared")
+  BLDARGS+=(--layout=tagged)
+  ./bootstrap.sh
+  ./b2 "${BLDARGS[@]}" stage
+  ./b2 "${BLDARGS[@]}" install
 else
   echo "Using cached boost at $BOOST_ROOT"
 fi

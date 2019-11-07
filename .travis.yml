@@ -13,10 +13,7 @@ env:
     - LCOV_EXCLUDE_FILES="*/src/test/*"
     - BOOST_ROOT=$HOME/boost_1_70_0
     - BOOST_URL='http://sourceforge.net/projects/boost/files/boost/1.70.0/boost_1_70_0.tar.gz'
-    - APP=validator-keys
-    - APP_ARGS=--unittest
     - VERBOSE_BUILD=true
-    - GCC_VER=7
 
 addons:
   apt:
@@ -38,44 +35,45 @@ addons:
       - texinfo
       - cmake
       - lcov
-      - llvm-7
-      - clang-7
+      - llvm-8
+      - clang-8
 
 matrix:
   include:
 
-    - compiler: gcc
+    - compiler: clang-8
       env:
-      - BUILD_TYPE=Debug
-      - CMAKE_EXTRA_ARGS=-Dcoverage=ON
+        - BUILD_TYPE=Debug
+        - MATRIX_EVAL="CC=clang-8 && CXX=clang++-8"
 
-    - compiler: clang
+    - compiler: gcc-8
       env:
-      - BUILD_TYPE=Debug
+        - BUILD_TYPE=Release
+        - MATRIX_EVAL="CC=gcc-8 && CXX=g++-8"
 
-    - compiler: gcc
+    - compiler: clang-8
       env:
-      - BUILD_TYPE=Release
+        - BUILD_TYPE=Release
+        - MATRIX_EVAL="CC=clang-8 && CXX=clang++-8"
 
-    - compiler: clang
+    - compiler: gcc-8
       env:
-      - BUILD_TYPE=Release
+        - BUILD_TYPE=Debug
+        - CMAKE_EXTRA_ARGS=-Drippled_tag=master
+        - MATRIX_EVAL="CC=gcc-8 && CXX=g++-8"
 
-    - compiler: gcc
+    - compiler: gcc-8
       env:
-      - BUILD_TYPE=Debug
-      - CMAKE_EXTRA_ARGS=-Drippled_tag=master
-
-    - compiler: gcc
-      env:
-      - BUILD_TYPE=Debug
-      - CMAKE_EXTRA_ARGS=-Drippled_tag=develop
+        - BUILD_TYPE=Debug
+        - CMAKE_EXTRA_ARGS=-Drippled_tag=develop
+        - MATRIX_EVAL="CC=gcc-8 && CXX=g++-8"
 
 cache:
   directories:
-  - $BOOST_ROOT
+    - $BOOST_ROOT
 
 before_install:
+  - if [ "${MATRIX_EVAL}" != "" ] ; then eval "${MATRIX_EVAL}"; fi
   - ( ci/install-dependencies.sh )
   - export PATH=/usr/local/bin:$PATH
 
